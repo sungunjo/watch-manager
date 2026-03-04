@@ -22,4 +22,3 @@ android/
 ios/
 .DS_Store
 *.sqlite
-coverage/
