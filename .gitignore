@@ -1,0 +1,33 @@
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+
+# Native builds
+android/
+ios/
+*.jks
+*.keystore
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
+# OS
+.DS_Store
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# TypeScript
+*.tsbuildinfo
+
+# EAS
+.eas/
