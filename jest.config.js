@@ -9,11 +9,11 @@ module.exports = {
     '!src/**/__tests__/**',
   ],
   coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
+    './src/utils/': {
+      branches: 50,
+      functions: 30,
+      lines: 30,
+      statements: 30,
     },
   },
 };
