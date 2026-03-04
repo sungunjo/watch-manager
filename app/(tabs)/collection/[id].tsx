@@ -32,6 +32,21 @@ import { DailyRateChart } from '../../../src/components/measurement/DailyRateCha
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+function PlaceholderTab({ icon, title, description, actionLabel, onAction }: {
+  icon: string; title: string; description: string; actionLabel: string; onAction: () => void;
+}) {
+  return (
+    <View style={{ padding: 24, alignItems: 'center' }}>
+      <Ionicons name={icon as any} size={48} color={Colors.textSecondary} />
+      <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 12 }}>{title}</Text>
+      <Text style={{ color: Colors.textSecondary, marginTop: 8, textAlign: 'center' }}>{description}</Text>
+      <TouchableOpacity onPress={onAction} style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.primary, borderRadius: 8 }}>
+        <Text style={{ color: '#fff', fontWeight: '600' }}>{actionLabel}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function WatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
