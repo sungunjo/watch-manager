@@ -42,10 +42,12 @@ jobs:
         run: npx expo lint
 
       - name: Unit tests
-        run: npx jest --ci --coverage --reporters=default
+        run: npx jest --ci --coverage
 
       - name: Expo export check
         run: npx expo export --platform web
+        env:
+          NODE_ENV: production
 
       - name: Upload coverage report
         if: always()
@@ -60,7 +62,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: |
-            coverage/
-            jest-results/
+          path: coverage/
           retention-days: 7
