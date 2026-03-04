@@ -15,50 +15,27 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-rou
 import { Ionicons } from '@expo/vector-icons';
 
 import { useWatches } from '../../../src/hooks/useWatches';
-import { useMeasurements } from '../../../src/hooks/useMeasurements';
-import { useServiceRecords } from '../../../src/hooks/useServiceRecords';
-import { Watch, WatchPhoto, WatchStatus, Measurement, ServiceRecord } from '../../../src/types';
+import { Watch, WatchPhoto, WatchStatus, MovementType } from '../../../src/types';
 import {
   Colors,
   MOVEMENT_TYPE_LABELS,
   WATCH_STATUS_LABELS,
   CRYSTAL_TYPE_LABELS,
   PURCHASE_CONDITION_LABELS,
-  SERVICE_TYPE_LABELS,
+  CURRENCY_SYMBOLS,
 } from '../../../src/constants';
-import { formatKoreanDate } from '../../../src/utils/date';
-import { formatCurrency, formatDailyRate } from '../../../src/utils/calculation';
-import { DailyRateChart } from '../../../src/components/measurement/DailyRateChart';
+import { formatDate, formatKoreanDate } from '../../../src/utils/date';
+import { formatCurrency } from '../../../src/utils/calculation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-function PlaceholderTab({ icon, title, description, actionLabel, onAction }: {
-  icon: string; title: string; description: string; actionLabel: string; onAction: () => void;
-}) {
-  return (
-    <View style={{ padding: 24, alignItems: 'center' }}>
-      <Ionicons name={icon as any} size={48} color={Colors.textSecondary} />
-      <Text style={{ fontSize: 18, fontWeight: '600', marginTop: 12 }}>{title}</Text>
-      <Text style={{ color: Colors.textSecondary, marginTop: 8, textAlign: 'center' }}>{description}</Text>
-      <TouchableOpacity onPress={onAction} style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.primary, borderRadius: 8 }}>
-        <Text style={{ color: '#fff', fontWeight: '600' }}>{actionLabel}</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 export default function WatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { fetchWatchById, fetchPhotos, removeWatch } = useWatches();
 
-  const { fetchByWatchId: fetchMeasurements } = useMeasurements();
-  const { fetchByWatchId: fetchServices } = useServiceRecords();
-
   const [watch, setWatch] = useState<Watch | null>(null);
   const [photos, setPhotos] = useState<WatchPhoto[]>([]);
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
-  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'spec' | 'accuracy' | 'service' | 'wear'>('spec');
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -69,18 +46,12 @@ export default function WatchDetailScreen() {
         const watchData = await fetchWatchById(parseInt(id));
         if (watchData) {
           setWatch(watchData);
-          const [photoData, measureData, serviceData] = await Promise.all([
-            fetchPhotos(watchData.id),
-            fetchMeasurements(watchData.id),
-            fetchServices(watchData.id),
-          ]);
+          const photoData = await fetchPhotos(watchData.id);
           setPhotos(photoData.filter((p) => p.photoType === 'WATCH'));
-          setMeasurements(measureData);
-          setServiceRecords(serviceData);
         }
       };
       load();
-    }, [id, fetchWatchById, fetchPhotos, fetchMeasurements, fetchServices])
+    }, [id, fetchWatchById, fetchPhotos])
   );
 
   const handleDelete = () => {
@@ -234,22 +205,21 @@ export default function WatchDetailScreen() {
         <View style={styles.tabContent}>
           {activeTab === 'spec' && <SpecTab watch={watch} />}
           {activeTab === 'accuracy' && (
-            <AccuracyTab
-              watchId={watch.id}
-              measurements={measurements}
-              serviceRecords={serviceRecords}
-              onStartMeasurement={() =>
-                router.push(`/modals/measurement?watchId=${watch.id}`)
-              }
+            <PlaceholderTab
+              icon="timer-outline"
+              title="정밀도 탭"
+              description="측정 이력 차트는 PR #5에서 구현됩니다"
+              actionLabel="측정 시작하기"
+              onAction={() => router.push(`/modals/measurement?watchId=${watch.id}`)}
             />
           )}
           {activeTab === 'service' && (
-            <ServiceTab
-              watchId={watch.id}
-              serviceRecords={serviceRecords}
-              onAddService={() =>
-                router.push(`/modals/service-form?watchId=${watch.id}`)
-              }
+            <PlaceholderTab
+              icon="construct-outline"
+              title="유지보수 탭"
+              description="서비스 이력은 PR #6에서 구현됩니다"
+              actionLabel="서비스 등록"
+              onAction={() => router.push(`/modals/service-form?watchId=${watch.id}`)}
             />
           )}
           {activeTab === 'wear' && (
@@ -448,147 +418,31 @@ const specStyles = StyleSheet.create({
   },
 });
 
-// ===== Accuracy Tab =====
-function AccuracyTab({
-  watchId,
-  measurements,
-  serviceRecords,
-  onStartMeasurement,
+// ===== Placeholder Tab =====
+function PlaceholderTab({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
 }: {
-  watchId: number;
-  measurements: Measurement[];
-  serviceRecords: ServiceRecord[];
-  onStartMeasurement: () => void;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
 }) {
-  const completed = measurements.filter((m) => m.dailyRateSec !== undefined);
   return (
-    <View style={{ padding: 16 }}>
-      {completed.length === 0 ? (
-        <View style={placeholderStyles.container}>
-          <Ionicons name="timer-outline" size={48} color={Colors.textMuted} />
-          <Text style={placeholderStyles.title}>측정 기록 없음</Text>
-          <Text style={placeholderStyles.desc}>Timegrapher로 정밀도를 측정해보세요</Text>
-          <TouchableOpacity style={placeholderStyles.btn} onPress={onStartMeasurement}>
-            <Text style={placeholderStyles.btnText}>측정 시작하기</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <DailyRateChart
-            measurements={completed}
-            serviceRecords={serviceRecords}
-            height={200}
-          />
-          {completed.slice(0, 10).map((m) => {
-            const rate = m.dailyRateSec ?? 0;
-            const color = Math.abs(rate) <= 4 ? Colors.success : Math.abs(rate) <= 10 ? Colors.warning : Colors.error;
-            return (
-              <View key={m.id} style={accStyles.row}>
-                <Text style={[accStyles.rate, { color }]}>{rate >= 0 ? '+' : ''}{rate.toFixed(2)} s/d</Text>
-                <Text style={accStyles.date}>{m.measurementDate.split('T')[0]}</Text>
-                {m.notes && <Text style={accStyles.note} numberOfLines={1}>{m.notes}</Text>}
-              </View>
-            );
-          })}
-          <TouchableOpacity style={placeholderStyles.btn} onPress={onStartMeasurement}>
-            <Text style={placeholderStyles.btnText}>+ 측정 추가</Text>
-          </TouchableOpacity>
-        </>
-      )}
+    <View style={placeholderStyles.container}>
+      <Ionicons name={icon} size={48} color={Colors.textMuted} />
+      <Text style={placeholderStyles.title}>{title}</Text>
+      <Text style={placeholderStyles.desc}>{description}</Text>
+      <TouchableOpacity style={placeholderStyles.btn} onPress={onAction}>
+        <Text style={placeholderStyles.btnText}>{actionLabel}</Text>
+      </TouchableOpacity>
     </View>
   );
 }
-
-const accStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  rate: { fontSize: 14, fontWeight: '700', minWidth: 80 },
-  date: { fontSize: 12, color: Colors.textMuted, flex: 1 },
-  note: { fontSize: 11, color: Colors.textMuted, flex: 1 },
-});
-
-// ===== Service Tab =====
-function ServiceTab({
-  watchId,
-  serviceRecords,
-  onAddService,
-}: {
-  watchId: number;
-  serviceRecords: ServiceRecord[];
-  onAddService: () => void;
-}) {
-  return (
-    <View style={{ padding: 16 }}>
-      {serviceRecords.length === 0 ? (
-        <View style={placeholderStyles.container}>
-          <Ionicons name="construct-outline" size={48} color={Colors.textMuted} />
-          <Text style={placeholderStyles.title}>서비스 이력 없음</Text>
-          <Text style={placeholderStyles.desc}>오버홀, 수리 등 서비스 이력을 기록하세요</Text>
-          <TouchableOpacity style={placeholderStyles.btn} onPress={onAddService}>
-            <Text style={placeholderStyles.btnText}>서비스 등록</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          {serviceRecords.map((s) => (
-            <View key={s.id} style={svcStyles.card}>
-              <View style={svcStyles.header}>
-                <Text style={svcStyles.type}>{SERVICE_TYPE_LABELS[s.serviceType]}</Text>
-                <Text style={svcStyles.date}>{s.serviceDate}</Text>
-              </View>
-              {s.serviceProvider && <Text style={svcStyles.provider}>{s.serviceProvider}</Text>}
-              {s.cost && s.currency && (
-                <Text style={svcStyles.cost}>
-                  {formatCurrency(s.cost, s.currency)}
-                </Text>
-              )}
-              {s.description && <Text style={svcStyles.desc} numberOfLines={2}>{s.description}</Text>}
-              {(s.beforeDailyRate !== undefined || s.afterDailyRate !== undefined) && (
-                <View style={svcStyles.rateRow}>
-                  {s.beforeDailyRate !== undefined && (
-                    <Text style={svcStyles.rateLabel}>전: {s.beforeDailyRate >= 0 ? '+' : ''}{s.beforeDailyRate.toFixed(1)}s/d</Text>
-                  )}
-                  {s.afterDailyRate !== undefined && (
-                    <Text style={[svcStyles.rateLabel, { color: Colors.success }]}>후: {s.afterDailyRate >= 0 ? '+' : ''}{s.afterDailyRate.toFixed(1)}s/d</Text>
-                  )}
-                </View>
-              )}
-            </View>
-          ))}
-          <TouchableOpacity style={[placeholderStyles.btn, { marginTop: 8, alignSelf: 'center' }]} onPress={onAddService}>
-            <Text style={placeholderStyles.btnText}>+ 서비스 추가</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
-  );
-}
-
-const svcStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    marginBottom: 8,
-    gap: 4,
-  },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  type: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  date: { fontSize: 12, color: Colors.textMuted },
-  provider: { fontSize: 13, color: Colors.textSecondary },
-  cost: { fontSize: 13, color: Colors.gold, fontWeight: '600' },
-  desc: { fontSize: 12, color: Colors.textMuted, lineHeight: 18 },
-  rateRow: { flexDirection: 'row', gap: 12 },
-  rateLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
-});
 
 const placeholderStyles = StyleSheet.create({
   container: {
