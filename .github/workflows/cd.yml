@@ -38,11 +38,21 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Verify EAS authentication
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Please add it in GitHub repo Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          eas whoami
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Extract version from app.json
         id: version
         run: |
           VERSION=$(node -p "require('./app.json').expo.version")
-          VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode || 1")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION (versionCode: $VERSION_CODE)"
@@ -67,11 +77,33 @@ jobs:
             --profile production \
             --non-interactive \
             --wait \
-            --json)
-          BUILD_URL=$(echo "$BUILD_JSON" | jq -r '
-            if type == "array" then .[0] else . end
-            | .artifacts.buildUrl // .artifacts.applicationArchiveUrl // ""
-          ')
+            --json \
+            2>/dev/null)
+          echo "EAS build output received"
+          BUILD_URL=$(echo "$BUILD_JSON" | python3 -c "
+          import sys, json
+          text = sys.stdin.read().strip()
+          for line in reversed(text.split('\n')):
+              line = line.strip()
+              if not line:
+                  continue
+              try:
+                  data = json.loads(line)
+                  if isinstance(data, list):
+                      data = data[0]
+                  artifacts = data.get('artifacts') or {}
+                  url = artifacts.get('applicationArchiveUrl') or artifacts.get('buildUrl') or ''
+                  if url:
+                      print(url)
+                      break
+              except Exception:
+                  pass
+          " 2>/dev/null || echo "")
+          if [ -z "$BUILD_URL" ]; then
+            echo "::error::Failed to extract APK download URL from EAS build output."
+            echo "EAS build output: $BUILD_JSON"
+            exit 1
+          fi
           echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
           echo "Build URL: $BUILD_URL"
 
