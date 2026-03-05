@@ -89,6 +89,8 @@ jobs:
 
       - name: Build Android APK with EAS
         id: eas_build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           BUILD_JSON=$(eas build \
             --platform android \
@@ -96,7 +98,7 @@ jobs:
             --non-interactive \
             --wait \
             --json \
-            2>/dev/null)
+            2>&1)
           echo "EAS build output received"
           BUILD_URL=$(echo "$BUILD_JSON" | python3 -c "
           import sys, json
