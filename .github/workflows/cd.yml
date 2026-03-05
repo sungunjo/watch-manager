@@ -41,12 +41,30 @@ jobs:
       - name: Verify EAS authentication
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN secret is not set. Please add it in GitHub repo Settings > Secrets and variables > Actions."
+            echo "::error::EXPO_TOKEN secret is not set."
+            exit 1
+          fi
+          if [ -z "$EAS_PROJECT_ID" ]; then
+            echo "::error::EAS_PROJECT_ID secret is not set. Find it at expo.dev > Project > Settings > Project ID."
             exit 1
           fi
           eas whoami
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+
+      - name: Inject EAS project ID into app.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const app = require('./app.json');
+            app.expo.extra = app.expo.extra || {};
+            app.expo.extra.eas = { projectId: process.env.EAS_PROJECT_ID };
+            fs.writeFileSync('./app.json', JSON.stringify(app, null, 2));
+            console.log('Injected projectId:', process.env.EAS_PROJECT_ID);
+          "
+        env:
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
 
       - name: Extract version from app.json
         id: version
