@@ -53,17 +53,22 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
 
-      - name: Inject EAS project ID into app.json
+      - name: Inject EAS project ID and owner into app.json
         run: |
+          export EXPO_USER=$(eas whoami)
+          echo "Expo username: $EXPO_USER"
           node -e "
             const fs = require('fs');
             const app = require('./app.json');
+            app.expo.owner = process.env.EXPO_USER;
             app.expo.extra = app.expo.extra || {};
             app.expo.extra.eas = { projectId: process.env.EAS_PROJECT_ID };
             fs.writeFileSync('./app.json', JSON.stringify(app, null, 2));
+            console.log('Injected owner:', process.env.EXPO_USER);
             console.log('Injected projectId:', process.env.EAS_PROJECT_ID);
           "
         env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
 
       - name: Extract version from app.json
@@ -92,6 +97,12 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
+          echo "EAS CLI version: $(eas --version)"
+          echo "=== app.json (eas section) ==="
+          node -p "JSON.stringify(require('./app.json').expo.extra?.eas, null, 2)"
+          echo "owner: $(node -p "require('./app.json').expo.owner")"
+          echo "=============================="
+
           set +e
           BUILD_JSON=$(eas build \
             --platform android \
@@ -103,12 +114,14 @@ jobs:
           EAS_EXIT_CODE=$?
           set -e
 
+          echo "$BUILD_JSON" > /tmp/eas-build-output.txt
+
           echo "=== EAS build output ==="
           echo "$BUILD_JSON"
           echo "========================"
 
           if [ $EAS_EXIT_CODE -ne 0 ]; then
-            echo "::error::EAS build command failed with exit code $EAS_EXIT_CODE. See output above for details."
+            echo "::error::EAS build command failed with exit code $EAS_EXIT_CODE. Download the 'eas-build-output' artifact for details."
             exit $EAS_EXIT_CODE
           fi
 
@@ -137,6 +150,14 @@ jobs:
           fi
           echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
           echo "Build URL: $BUILD_URL"
+
+      - name: Upload EAS build output on failure
+        if: failure() && steps.eas_build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-output
+          path: /tmp/eas-build-output.txt
+          retention-days: 7
 
       - name: Download APK artifact
         run: |
