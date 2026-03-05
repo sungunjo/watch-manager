@@ -92,6 +92,7 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
+          set +e
           BUILD_JSON=$(eas build \
             --platform android \
             --profile production \
@@ -99,7 +100,18 @@ jobs:
             --wait \
             --json \
             2>&1)
-          echo "EAS build output received"
+          EAS_EXIT_CODE=$?
+          set -e
+
+          echo "=== EAS build output ==="
+          echo "$BUILD_JSON"
+          echo "========================"
+
+          if [ $EAS_EXIT_CODE -ne 0 ]; then
+            echo "::error::EAS build command failed with exit code $EAS_EXIT_CODE. See output above for details."
+            exit $EAS_EXIT_CODE
+          fi
+
           BUILD_URL=$(echo "$BUILD_JSON" | python3 -c "
           import sys, json
           text = sys.stdin.read().strip()
@@ -121,7 +133,6 @@ jobs:
           " 2>/dev/null || echo "")
           if [ -z "$BUILD_URL" ]; then
             echo "::error::Failed to extract APK download URL from EAS build output."
-            echo "EAS build output: $BUILD_JSON"
             exit 1
           fi
           echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
