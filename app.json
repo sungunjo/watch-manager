@@ -22,6 +22,7 @@
         "backgroundColor": "#1a1a2e"
       },
       "package": "com.watchmanager.app",
+      "versionCode": 1,
       "permissions": [
         "NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
